@@ -1,5 +1,7 @@
+#https://diegokoz.shinyapps.io/wordcloud_marx/
 library(tm)
-library(wordcloud)
+library(wordcloud2)
+# library(wordcloud)
 library(memoise)
 library(tidyverse)
 library(magrittr)
@@ -7,7 +9,7 @@ library(magrittr)
 textos <- readRDS("textos.RDS")
 
 textos <- textos %>% 
-  filter(titulo !="aquí")
+  filter(!titulo %in% c("aquí","Vers. alterna"))
 
 titulos <- textos$titulo
 
@@ -26,7 +28,10 @@ getTermMatrix <- memoise(function(titulo) {
   myCorpus = tm_map(myCorpus, removePunctuation)
   myCorpus = tm_map(myCorpus, removeNumbers)
   myCorpus = tm_map(myCorpus, removeWords,
-                    c(stopwords(kind = "es"), "internet","regresar","actualizar"))
+                    c(stopwords(kind = "es"), "internet","regresar","actualizar", 
+                      "así", "tan","uno", "dos", "tres", "cuatro", "pues", "hacia", "incluso", 
+                      "cosas", "dado", "mayor","hace", "ayuda", "vol","pág", "tal", 
+                      "ello", "través","libro"))
   
   myDTM = TermDocumentMatrix(myCorpus,
                              control = list(minWordLength = 1))
@@ -61,7 +66,7 @@ ui <- fluidPage(
     
     # Show Word Cloud
     mainPanel(
-      plotOutput("plot",height ="600px")
+      wordcloud2Output("plot",height ="600px")
     )
   )
 )
@@ -83,13 +88,18 @@ server <- function(input, output, session) {
   })
   
   # para que se repita el mismo wordcloud en la sesion
-  wordcloud_rep <- repeatable(wordcloud)
+  wordcloud_rep <- repeatable(wordcloud2)
   
-  output$plot <- renderPlot({
+  output$plot <- renderWordcloud2({
     v <- terms()
-    wordcloud_rep(names(v), v, scale=c(4,0.5),
-                  min.freq = input$freq, max.words=input$max,
-                  colors=brewer.pal(8, "Dark2"))
+    vv <- data_frame(word = names(v), freq = v)
+    
+    vv <- vv %>% 
+      filter(freq>=input$freq) %>% 
+      top_n(.,n=input$max, wt = freq)
+    
+    wordcloud2(vv, shuffle = FALSE)
+    
   })
 }
 
