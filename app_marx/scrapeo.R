@@ -91,6 +91,7 @@ textos <- simple_links %>%
 
 ## limpieza
 
+
 # textos <- read_rds("data/txt/textos.RDS")
 
 textos$texto <- textos$texto %>% 

@@ -93,10 +93,6 @@ textos <- bind_rows(libros,texto_simple)
 saveRDS(textos, "data/txt/textos.RDS")
 
 
-
-
-
-
 #### Marx-Engels, Lenin, Trotsky y el Che vienen en otro formato ####
 
 urls <- c("https://www.marxists.org/espanol/m-e/indice.htm",
@@ -182,4 +178,36 @@ main_textos <- read_rds("data/txt/textos.RDS")
 textos <- bind_rows(meltg_textos,main_textos)
 
 table(textos$tipo)
+
+
+#### limpieza final####
+
+textos <- read_rds("data/txt/textos.RDS")
+
+limpiar_textos <- function(x){
+  x %>% 
+    # rvest::repair_encoding(.) %>% 
+    str_replace_all(pattern = "(?i)#([0-9A-F]{2})\1{2}", replacement = " ") %>%
+    str_replace_all(pattern = "\n", replacement = " ") %>%
+    str_replace_all(pattern = "[\\^]", replacement = " ") %>%
+    str_replace_all(pattern = "\"", replacement = " ") %>%
+    str_replace_all(pattern = "<.*>", replacement = " ") %>%
+    str_replace_all(pattern = "<[^>]*>", replacement = " ") %>%
+    str_replace_all(pattern = "<.*?>", replacement = " ") %>%
+    str_replace_all(pattern = "\\s+", replacement = " ") %>%
+    str_replace_all(pattern = "\\{ .* \\}", replacement = " ") %>%
+    str_trim(side = "both")
+}
+
+
+textos_limpio <- textos %>%
+  ungroup() %>% 
+  mutate(texto = limpiar_textos(texto),
+         autor = limpiar_textos(autor),
+         titulo = limpiar_textos(titulo))
+
+
+saveRDS(textos_limpio, "data/txt/textos_limpio.RDS")
+
+
 
