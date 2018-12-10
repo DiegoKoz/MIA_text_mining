@@ -35,4 +35,12 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 
-data/*
+.Rproj.user
+
+# scrapeos intermedios
+
+data/txt/meltg_text.RDS
+data/txt/main_libros.RDS
+data/txt/meltg_libros.RDS
+data/txt/meltg_textos.RDS
+data/txt/main_text.RDS
