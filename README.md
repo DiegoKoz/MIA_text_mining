@@ -1,5 +1,10 @@
 
-#  https://diegokoz.shinyapps.io/wordcloud_marx/
+Escrapeo de https://www.marxists.org/espanol
 
 
-Escrapeo de https://www.marxists.org/espanol/m-e/ y shiny con nube de palabras
+Apps: 
+
+###  https://diegokoz.shinyapps.io/wordcloud_marx/
+###  https://diegokoz.shinyapps.io/app_MIA/
+
+

@@ -1,4 +1,5 @@
 library(rvest)
+library(xml2)
 library(tidyverse)
 library(glue)
 #### funciones #####
@@ -10,6 +11,7 @@ get_text <- function(link){
 get_new_links <- function(link){
   tryCatch({
   
+  base <- link
   nodes <- read_html(link) %>% 
     rvest::html_nodes("a")  
   
@@ -17,11 +19,13 @@ get_new_links <- function(link){
     filter(!str_detect(link,"(\\.\\.)|NA|.doc|.zip|.pdf|wikipedia|http|mailto"),
            link!="") %>% 
     na.omit(.) %>%
-    mutate(link = gsub("#.*","",link)) %>% 
+    mutate(link = gsub("#.*","",link),
+           link= xml2::url_absolute(link, base= base)) %>% 
     distinct(link,.keep_all = TRUE )
 
-  },error = function(err) {glue::glue("err in {link}")})
+  },error = function(err) {glue::glue("error_in_link: {link}")})
 }
+
 #### scrapping del MIA central #####
 
 url <- "https://www.marxists.org/espanol/indice.htm"
@@ -45,7 +49,7 @@ df_links <- df_links %>%
   mutate(nested_link = map(link, get_new_links))
 
 df_links <- df_links %>%
-  filter(!str_detect(nested_link,"err in ")) %>% 
+  filter(!str_detect(nested_link,"error_in_link")) %>% 
   unnest()
 
 
@@ -53,25 +57,22 @@ df_links <- df_links %>%
 
 texto_simple <- df_links %>%
   filter(!str_detect(link1,"index")) %>% 
-  mutate(nested_link = paste0(gsub("/index.htm","",link),"/",link1),
-         texto = map(nested_link,get_text)) %>%
+  mutate(texto = map(link1,get_text)) %>%
   unnest() %>% 
   select(autor, titulo, texto)
 
-saveRDS(texto_simple,"data/txt/main_text.RDS") #guardo parcial porque tarda
-
+# saveRDS(texto_simple,"data/txt/main_text.RDS") #guardo parcial porque tarda
+texto_simple <- read_rds("data/txt/main_text.RDS")
 
 libros <- df_links %>% 
   filter(str_detect(link1,"index")) %>% 
-  mutate(nested_link = paste0(gsub("index.htm","",link),link1),
-         nested_nested_link = map(nested_link, get_new_links)) %>% #busco los nuevos links dentro de los libros
-  filter(!str_detect(nested_nested_link,"err in ")) %>% 
+  mutate(nested_link = map(link1, get_new_links)) %>% #busco los nuevos links dentro de los libros
+  filter(!str_detect(nested_nested_link,"error_in_link")) %>% 
   unnest(.)
 
 #descargo el texto de cada capitulo
 libros <- libros %>%
-  mutate(nested_nested_link = paste0(gsub("index.htm","",nested_link),link2),
-         texto = map(nested_nested_link,get_text)) %>%
+  mutate(texto = map(link2,get_text)) %>%
   unnest(.) %>% 
   filter(!str_detect(texto, "error_in_link"))
 
@@ -80,8 +81,10 @@ libros <- libros %>%
   group_by(autor,titulo) %>%
   summarise(texto = paste(texto, collapse = "/n"))
 
-saveRDS(libros,"data/txt/main_libros.RDS") #guardo parcial porque tarda
+# saveRDS(libros,"data/txt/main_libros.RDS") #guardo parcial porque tarda
+libros <- read_rds("data/txt/main_libros.RDS")
 
+## junto todo
 
 texto_simple <- texto_simple %>% 
   mutate(tipo="notas")
@@ -90,7 +93,7 @@ libros <- libros %>%
 
 textos <- bind_rows(libros,texto_simple)
 
-saveRDS(textos, "data/txt/textos.RDS")
+saveRDS(textos, "data/txt/main_textos.RDS")
 
 
 #### Marx-Engels, Lenin, Trotsky y el Che vienen en otro formato ####
@@ -101,7 +104,7 @@ urls <- c("https://www.marxists.org/espanol/m-e/indice.htm",
          "https://www.marxists.org/espanol/guevara/escritos/index.htm")
 
 
-df_links <- data.frame(autor= c('marx_engels','lenin','totsky','guevara'),
+df_links <- data.frame(autor= c('marx_engels','lenin','trotsky','guevara'),
                        link = urls) 
 
 
@@ -118,32 +121,31 @@ df_links <- df_links %>%
 
 df_links <- df_links %>% 
   mutate(nested_link = map(link, get_new_links)) %>% 
-  filter(!str_detect(nested_link,"err in ")) %>% 
+  filter(!str_detect(nested_link,"error_in_link")) %>% 
   unnest()
 
 ## separo el texto directo, de los libros (que tienen indice y sub links)
 
 texto_simple <- df_links %>%
   filter(!str_detect(link1,"index")) %>% 
-  mutate(nested_link = paste0(gsub("/index.htm","",link),"/",link1),
-         texto = map(nested_link,get_text)) %>%
+  mutate(texto = map(link1,get_text)) %>%
   unnest() %>% 
+  filter(!str_detect(texto, "error_in_link")) %>% 
   select(autor, titulo, texto)
 
 saveRDS(texto_simple,"data/txt/meltg_text.RDS") #guardo parcial porque tarda
 
+# texto_simple <- read_rds("data/txt/meltg_text.RDS")
 
 libros <- df_links %>% 
   filter(str_detect(link1,"index")) %>% 
-  mutate(nested_link = paste0(gsub("index.htm|escritos.htm|indice.htm","",link),link1),
-         nested_nested_link = map(nested_link, get_new_links)) %>% #busco los nuevos links dentro de los libros
-  filter(!str_detect(nested_nested_link,"err in ")) %>% 
+  mutate(nested_link = map(link1, get_new_links)) %>% #busco los nuevos links dentro de los libros
+  filter(!str_detect(nested_link,"error_in_link")) %>% 
   unnest(.)
 
 #descargo el texto de cada capitulo
 libros <- libros %>%
-  mutate(nested_nested_link = paste0(gsub("index.htm","",nested_link),link2),
-         texto = map(nested_nested_link,get_text)) %>%
+  mutate(texto = map(link2,get_text)) %>%
   unnest(.) %>% 
   filter(!str_detect(texto, "error_in_link"))
 
@@ -154,7 +156,7 @@ libros <- libros %>%
 
 saveRDS(libros,"data/txt/meltg_libros.RDS") #guardo parcial porque tarda
 
-
+# libros <- read_rds("data/txt/meltg_libros.RDS")
 
 
 ## junto todo
@@ -172,21 +174,30 @@ saveRDS(textos, "data/txt/meltg_textos.RDS")
 ###### Junto MELTG y main MIA
 
 meltg_textos <- read_rds("data/txt/meltg_textos.RDS")
-main_textos <- read_rds("data/txt/textos.RDS")
+main_textos <- read_rds("data/txt/main_textos.RDS")
+
+
+
+errores <-meltg_textos %>% as.tibble() %>% 
+  filter(str_detect(texto, "error_in_link"))
 
 
 textos <- bind_rows(meltg_textos,main_textos)
 
 table(textos$tipo)
 
+saveRDS(textos,"data/txt/textos.RDS")
 
 #### limpieza final####
 
 textos <- read_rds("data/txt/textos.RDS")
 
 limpiar_textos <- function(x){
+  
   x %>% 
-    # rvest::repair_encoding(.) %>% 
+    iconv(., from = 'UTF-8', to = 'ASCII//TRANSLIT') %>% 
+    # rvest::repair_encoding(., from = Encoding(x)) %>%
+    str_replace_all(pattern = "[^[:alnum:]]", replacement = " ") %>%
     str_replace_all(pattern = "(?i)#([0-9A-F]{2})\1{2}", replacement = " ") %>%
     str_replace_all(pattern = "\n", replacement = " ") %>%
     str_replace_all(pattern = "[\\^]", replacement = " ") %>%
@@ -202,11 +213,17 @@ limpiar_textos <- function(x){
 
 textos_limpio <- textos %>%
   ungroup() %>% 
-  mutate(texto = limpiar_textos(texto),
-         autor = limpiar_textos(autor),
-         titulo = limpiar_textos(titulo))
+  mutate(texto = map(texto,limpiar_textos),
+         autor = map(autor,limpiar_textos),
+         titulo = map(titulo,limpiar_textos)) %>% 
+  unnest()
 
 
+textos_limpio <- textos_limpio %>% 
+  na.omit(.) %>% 
+  filter(!(titulo == "Sobre la Teoria de la Relatividad" & autor == "Albert Einstein"))
+
+saveRDS(textos_limpio, "app_MIA/textos.RDS")
 saveRDS(textos_limpio, "data/txt/textos_limpio.RDS")
 
 

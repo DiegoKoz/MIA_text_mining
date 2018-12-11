@@ -6,29 +6,28 @@ library(memoise)
 library(tidyverse)
 library(magrittr)
 
-textos <- readRDS("app_MIA/textos.RDS")
+textos <- readRDS("textos.RDS")
 
 textos <- textos %>% 
   filter(!titulo %in% c("aquí","Vers. alterna"))
 
 
-
-autores <- unique(textos$autor)
-#titulos <- textos$titulo
-aut <- autores[1]
-
-titulos <- textos %>% 
-  filter(autor==aut)
-
+autores <-names(sort(table(textos$autor),decreasing = T))
 
 # cachea resultados y no recalcula todo
-getTermMatrix <- memoise(function(autor, titulo) {
-
-  if (!(titulo %in% titulos))
-    stop("Unknown book")
+getTermMatrix <- memoise(function(aut, titulo) {
   
-  text <-  textos$texto[textos$titulo==titulo]
+  if (!(aut %in% autores)) {
+    stop("Autor desconocido")
+  } 
+  titulos <- textos %>% 
+    filter(autor==aut) %$% 
+    titulo
+  if (!(titulo %in% titulos)) {
+    stop("Titulo desconocido")
+  }
   
+  text <- textos$texto[textos$autor==aut & textos$titulo==titulo]
   
   myCorpus = Corpus(VectorSource(text))
   myCorpus = tm_map(myCorpus, content_transformer(tolower))
@@ -42,9 +41,7 @@ getTermMatrix <- memoise(function(autor, titulo) {
   
   myDTM = TermDocumentMatrix(myCorpus,
                              control = list(minWordLength = 1))
-  
   m = as.matrix(myDTM)
-  
   sort(rowSums(m), decreasing = TRUE)
 })
 
@@ -57,8 +54,13 @@ ui <- fluidPage(
   sidebarLayout(
     # inputs
     sidebarPanel(
-      selectInput("selection", "Eliga un texto",
-                  choices = titulos),
+      selectInput("aut", "Elija un autor",
+                  choices = autores, 
+                  selected="marx engels"),
+      # uiOutput("seleccion_titulo"),
+      selectInput("selection", "Elija un texto",
+                  choices = textos$titulo,
+                  selected="Tesis sobre Feuerbach"),
       actionButton("update", "Actualizar"),
       hr(),
       sliderInput("freq",
@@ -80,14 +82,24 @@ ui <- fluidPage(
 ###
 
 server <- function(input, output, session) {
-  # Define una reactive expression para el dtm
+
+  
+  observe(
+    {
+      input$aut
+      # Update based on the month change event
+      updateSelectInput(session, "selection", "Elija un texto",
+                        choices = as.character(textos$titulo[textos$autor==input$aut]),
+                        selected="Tesis sobre Feuerbach")
+})
+
   terms <- reactive({
     # actualiza
     input$update
     isolate({
       withProgress({
         setProgress(message = "procesando el texto...")
-        getTermMatrix(input$selection)
+        getTermMatrix(input$aut, input$selection)
       })
     })
   })
