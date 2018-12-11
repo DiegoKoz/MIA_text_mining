@@ -37,7 +37,8 @@ getTermMatrix <- memoise(function(aut, titulo) {
                     c(stopwords(kind = "es"), "internet","regresar","actualizar", 
                       "así", "tan","uno", "dos", "tres", "cuatro", "pues", "hacia", "incluso", 
                       "cosas", "dado", "mayor","hace", "ayuda", "vol","pág", "tal", 
-                      "ello", "través","libro", "sólo", "sino"))
+                      "ello", "través","libro", "sólo", "sino", "ocean", "press","archive", "com", "www","web",
+                      "habia", "traves", "info", "siguiente","oceanbooks", "pagina", "mia"))
   
   myDTM = TermDocumentMatrix(myCorpus,
                              control = list(minWordLength = 1))
