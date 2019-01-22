@@ -1,5 +1,5 @@
 
-Escrapeo de https://www.marxists.org/espanol
+Scrapping of https://www.marxists.org/espanol
 
 
 Apps: 
@@ -8,3 +8,8 @@ Apps:
 ###  https://diegokoz.shinyapps.io/app_MIA/
 
 
+-----------
+
+TSNE-projection of WordVectors
+
+![](WordVectors/tsne.jpg)
