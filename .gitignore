@@ -44,3 +44,10 @@ data/txt/main_libros.RDS
 data/txt/meltg_libros.RDS
 data/txt/meltg_textos.RDS
 data/txt/main_text.RDS
+
+# Word Vectors (los paso a LFS)
+#/*.bin
+#/*.vec
+
+
+
