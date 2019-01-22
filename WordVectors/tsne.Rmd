@@ -1,0 +1,43 @@
+---
+title: "T-SNE projection of embeddings"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(fastrtext)
+library(Rtsne)
+```
+
+cargo el modelo y obtengo los WV
+```{r}
+model_fasttext <- load_model("fasttext_word_vectors_embeddings.bin")
+
+wv <- model_fasttext$get_vectors(model_fasttext$get_dictionary())
+```
+
+hago la reduccion con partial-pca + T-SNE
+
+```{r eval=FALSE, include=FALSE}
+tsne_proj <- Rtsne::Rtsne(wv,
+                          check_duplicates = F,
+                          partial_pca = T,
+                          max_iter = 500)
+
+saveRDS(tsne_proj, file = 'tsne_proj.RDS')
+```
+
+```{r}
+tsne_proj <- read_rds('tsne_proj.RDS')
+```
+
+```{r}
+jpeg("tsne.jpg", width=9600, height=7200)
+plot(tsne_proj$Y, t='n', main="T-sne")
+text(tsne_proj$Y, labels=rownames(wv))
+```
+
+#todo
+
+- La similitud es más sintáctica que semántica: FastText suele sesgarse hacia la similitud sintáctica, habría que probar con WV.
+- Buscar una buena forma de visualizar los resultados
