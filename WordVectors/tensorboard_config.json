@@ -1,0 +1,13 @@
+{
+  "embeddings": [
+    {
+      "tensorName": "MIA tensors",
+      "tensorShape": [
+        10000,
+        200
+      ],
+      "tensorPath": "https://raw.githubusercontent.com/DiegoKoz/MIA_text_mining/master/WordVectors/tensors.tsv",
+      "metadataPath": "https://raw.githubusercontent.com/DiegoKoz/MIA_text_mining/master/WordVectors/log/metadata.tsv"
+    }
+  ]
+}
