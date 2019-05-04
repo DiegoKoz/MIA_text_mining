@@ -1,18 +1,17 @@
 
-Scrapping of https://www.marxists.org/espanol
+Scrappeo de https://www.marxists.org/espanol
 
 
-Apps: 
 
-###  https://diegokoz.shinyapps.io/wordcloud_marx/
+# Nubes de palabras
+
 ###  https://diegokoz.shinyapps.io/app_MIA/
 
 
 -----------
 
-TSNE-projection of WordVectors
 
-![](WordVectors/tsne.jpg)
+# Word Embedddings
 
 
-[Proyección con Tensorboard](https://projector.tensorflow.org/?config=https://raw.githubusercontent.com/DiegoKoz/MIA_text_mining/master/WordVectors/tensorboard_config.json)
+### [Proyección con Tensorboard](https://projector.tensorflow.org/?config=https://raw.githubusercontent.com/DiegoKoz/MIA_text_mining/master/WordVectors/tensorboard_config.json)
