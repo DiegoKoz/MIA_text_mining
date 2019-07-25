@@ -1,0 +1,170 @@
+---
+title: "Marxists Internet Archive"
+output: html_notebook
+---
+
+fuente: https://github.com/DiegoKoz/MIA_text_mining
+
+> Warning: Este dataset es muy pesado. Eso implica que lleva tiempo correr los modelos y que puede no entrar en la memoria de la computadora. Para la clase, se puede hacer un muestreo de textos para que no pese tanto
+
+```{r setup}
+library(tidyverse)
+library(glue)
+library(tm)
+library(topicmodels)
+library(tidytext)
+library(stringi)
+library(LDAvis)
+library(slam)
+library(tsne)
+library(lubridate)
+library(DT)
+
+```
+
+```{r}
+df <- read_rds('data/MIA.RDS')
+df <- df %>% 
+  filter(tipo=='notas')
+```
+
+
+```{r}
+df <- df %>% 
+  mutate(texto = tolower(texto),
+         texto = stri_trans_general(texto, "Latin-ASCII"),
+         texto = str_trim(texto,side = 'both'),
+         texto = str_replace_all(texto,'\t',' '),
+         texto = str_replace_all(texto,'\n',' '),
+         texto = str_replace_all(texto,'\r',' '),
+         texto = str_replace_all(texto,'[[:punct:]]',' '),
+         texto = str_replace_all(texto,'\\d','NUM'),
+         texto = str_replace_all(texto,'(NUM)+','NUM'),
+         texto = str_replace_all(texto,"\\s+", " "))
+```
+
+
+
+Para topic modeling las palabras comunes de la lengua generan mucho ruido y terminan predominnado en los topicos.
+
+Vamos a eliminar no solo las Stop Words, sino también las palabras más utilizadas en el español que no están relacionadas con nuestra temática.
+Para eso, tenemos un archivo r_words.txt donde pusimos todas las palabras más comunes. 
+
+Además, aprovechamos para eliminar los tokens que quedaron del scrapeo que en realidad son parte del código html (ver final del archivo).
+
+¿de donde salieron estos tokens? En una primera iteración del LDA, uno de los tópicos que se armó era de código html. 
+
+```{r}
+palabras_comunes <- read_csv(file = 'data/r_words.txt',col_names = F)
+palabras_comunes <-stri_trans_general(palabras_comunes$X1, "Latin-ASCII") # le tengo que hacer la misma transformacion que al texto
+stop_words <- stri_trans_general(stopwords(kind = "es"), "Latin-ASCII")
+
+palabras_eliminar <- unique(c(stop_words,palabras_comunes))
+
+rm(stop_words)
+rm(palabras_comunes)
+gc()
+```
+
+
+```{r}
+
+Corpus = VCorpus(VectorSource(df$texto))
+Corpus = tm_map(Corpus, removeWords, palabras_eliminar)
+# Corpus <- tm_map(Corpus, stemDocument, language = "spanish") # Corpus  
+
+dtm <- DocumentTermMatrix(Corpus)
+rm(Corpus)
+gc()
+tm::nTerms(dtm)
+#elimino los docuemntos vacios
+rowTotals <- apply(dtm , 1, sum)
+nDocs(dtm)
+dtm   <- dtm[rowTotals> 0, ]
+nDocs(dtm)
+
+write_rds(dtm, 'data/dtm_MIA.rds')
+```
+
+limpio la memoria porque ya no me queda espacio
+```{r}
+rm(palabras_eliminar)
+rm(df)
+gc()
+```
+
+
+
+```{r}
+lda_fit <- LDA(dtm, k = 10,method = "Gibbs", control = list(delta=0.6,seed = 1234))
+lda_fit
+
+saveRDS(lda_fit, 'modelos/MIA_lda.rds') # Tarda mucho en correr, asi que guardamos los resultados
+```
+
+```{r}
+Terms <- terms(lda_fit, 10)
+Terms
+```
+
+
+Visualizacion
+
+
+
+
+```{r}
+topicmodels_json_ldavis <- function(fitted, dtm){
+    svd_tsne <- function(x) tsne(svd(x)$u)
+
+    # Find required quantities
+    phi <- as.matrix(posterior(fitted)$terms)
+    theta <- as.matrix(posterior(fitted)$topics)
+    vocab <- colnames(phi)
+    term_freq <- slam::col_sums(dtm)
+
+    # Convert to json
+    json_lda <- LDAvis::createJSON(phi = phi, theta = theta,
+                            vocab = vocab,
+                            mds.method = svd_tsne,
+                            plot.opts = list(xlab="tsne", ylab=""),
+                            doc.length = as.vector(table(dtm$i)),
+                            term.frequency = term_freq)
+
+    return(json_lda)
+}
+```
+
+```{r}
+json_res <- topicmodels_json_ldavis(lda_fit, dtm)
+
+serVis(json_res)
+```
+
+
+# Se puede calcular el tema del que habla en promedio cada autor.
+
+```{r}
+df <- read_rds('data/MIA.RDS')
+df <- df %>% 
+  filter(tipo=='notas')
+
+dist_topicos <- df[which(rowTotals>0),] %>%  #tengo que eliminar ese docuemnto que estaba vacio
+  select(autor) %>% 
+  bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
+
+dist_topicos <- dist_topicos %>% 
+  group_by(autor) %>% 
+  summarise_all(mean)
+
+
+datatable(dist_topicos, filter = 'top',extensions = 'Buttons', options = list(dom = 'Bfrtip',  buttons = c('excel', "csv", "copy", "pdf"),   pageLength = 20, autoWidth = TRUE),rownames= FALSE) %>%
+  formatPercentage(c('1','2','3','4','5','6','7','8','9','10'), 2) %>%
+  formatStyle(c('1','2','3','4','5','6','7','8','9','10'), background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  formatStyle(c('1','2','3','4','5','6','7','8','9','10'), 
+              backgroundSize = '98% 60%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'center')
+
+```
+
