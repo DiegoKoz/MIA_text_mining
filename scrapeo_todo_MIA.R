@@ -52,7 +52,6 @@ df_links <- df_links %>%
   filter(!str_detect(nested_link,"error_in_link")) %>% 
   unnest()
 
-
 ## separo el texto directo, de los libros (que tienen indice y sub links)
 
 texto_simple <- df_links %>%
