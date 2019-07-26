@@ -132,7 +132,44 @@ fechas_all %>%
 
 # estos autores tienen una estructura muy distinta
 
-
-
 fechas_all %>% 
   write_csv(.,'data/txt/fechas.csv')
+
+## limpieza y join
+
+limpiar_textos <- function(x){
+  
+  x %>% 
+    iconv(., from = 'UTF-8', to = 'ASCII//TRANSLIT') %>% 
+    # rvest::repair_encoding(., from = Encoding(x)) %>%
+    str_replace_all(pattern = "[^[:alnum:]]", replacement = " ") %>%
+    str_replace_all(pattern = "(?i)#([0-9A-F]{2})\1{2}", replacement = " ") %>%
+    str_replace_all(pattern = "\n", replacement = " ") %>%
+    str_replace_all(pattern = "[\\^]", replacement = " ") %>%
+    str_replace_all(pattern = "\"", replacement = " ") %>%
+    str_replace_all(pattern = "<.*>", replacement = " ") %>%
+    str_replace_all(pattern = "<[^>]*>", replacement = " ") %>%
+    str_replace_all(pattern = "<.*?>", replacement = " ") %>%
+    str_replace_all(pattern = "\\s+", replacement = " ") %>%
+    str_replace_all(pattern = "\\{ .* \\}", replacement = " ") %>%
+    str_trim(side = "both")
+}
+
+fechas_all <- read_csv('data/txt/fechas.csv')
+
+fechas_all <- fechas_all %>% 
+  mutate(id = paste(autor, titulo, '_'),
+      titulo = limpiar_textos(titulo))
+
+texto_limpio <- read_rds('data/txt/textos_limpio.RDS')
+
+texto_limpio <- texto_limpio %>% 
+  left_join(fechas_all,by = c("autor", "titulo"))
+
+texto_limpio <- texto_limpio %>% 
+  distinct(autor, titulo,.keep_all = T)
+
+
+
+texto_limpio %>% saveRDS('data/txt/textos_limpio.RDS')
+texto_limpio %>% write_csv('data/txt/texto_limpio.txt')
