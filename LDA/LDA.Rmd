@@ -273,7 +273,7 @@ dist_topicos <- df  %>%
 ```
 
 
-```{r warning=FALSE}
+```{r warning=FALSE,  fig.height=10, fig.width=10}
 plot <- dist_topicos %>% 
   select(-autor) %>%
   mutate(fecha= round(fecha, -1)) %>% 
