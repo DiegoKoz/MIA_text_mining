@@ -217,12 +217,14 @@ topicos_tsne <- tsne(dist_topicos[3:22],k = 2)
 
 topicos_tsne <- as_tibble(topicos_tsne,.name_repair = ~glue('tsne_proj_{c(1,2)}'))
 
-dist_topicos %>% bind_cols(topicos_tsne) %>% 
+grafico <- dist_topicos %>% bind_cols(topicos_tsne) %>% 
   ggplot(aes(tsne_proj_1,tsne_proj_2, label=autor, color=fecha)) + 
   geom_text()+
   theme_minimal()+
   scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1850)
 
+
+plotly::ggplotly(grafico)
 ```
 ```{r fig.height=10, fig.width=10}
 

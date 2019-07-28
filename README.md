@@ -18,4 +18,7 @@ Scrappeo de https://www.marxists.org/espanol
 
 # Topic Modeling
 
+### [Notebook](LDA/LDA.nb.html)
+
+
 ### [LDA viz](https://bl.ocks.org/DiegoKoz/raw/f2fc6b054268c397460d93e2c91375ef/#topic=0&lambda=1&term=)
