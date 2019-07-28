@@ -44,8 +44,9 @@ df <- df %>%
          texto = str_replace_all(texto,'\n',' '),
          texto = str_replace_all(texto,'\r',' '),
          texto = str_replace_all(texto,'[[:punct:]]',' '),
-         texto = str_replace_all(texto,'\\d','NUM'),
-         texto = str_replace_all(texto,'(NUM)+','NUM'),
+         texto = str_remove_all(texto,'\\d'),
+         # texto = str_replace_all(texto,'\\d','NUM'),
+         # texto = str_replace_all(texto,'(NUM)+','NUM'),
          texto = str_replace_all(texto,"\\s+", " "))
 ```
 
@@ -73,7 +74,7 @@ gc()
 ```
 
 
-```{r eval=FALSE}
+```{r}
 
 Corpus = VCorpus(VectorSource(df$texto))
 Corpus = tm_map(Corpus, removeWords, palabras_eliminar)
@@ -109,7 +110,7 @@ gc()
 
 
 
-```{r eval=FALSE}
+```{r }
 lda_fit <- LDA(dtm, k = 20,method = "Gibbs", control = list(delta=0.6,seed = 1234))
 lda_fit
 
@@ -127,11 +128,13 @@ Terms
 ```
 
 
+
+
 ```{r}
-diccionario <- tibble(
-n_topico = 1:20,
-nombre_topico = c('perestroika','formato','interna_bolche','pcf','expulsados','orwell','?','althusser','turcos','bolivia','longuet','ejercito','chile','españa','indoamericana','lenin','argentina','china','trabajo_prod','partido')
-)
+# diccionario <- tibble(
+# n_topico = 1:20,
+# nombre_topico = c('interna_bolche','formato','interna_bolche','pcf','expulsados','orwell','?','althusser','turcos','bolivia','longuet','ejercito','chile','españa','indoamericana','lenin','argentina','china','trabajo_prod','partido')
+# )
 ```
 
 
@@ -169,7 +172,7 @@ json_res <- topicmodels_json_ldavis(lda_fit, dtm)
 ```
 
 ```{r}
-serVis(json_res,as.gist = T)
+serVis(json_res,as.gist = T,open.browser = T)
 ```
 
 # Se puede calcular el tema del que habla en promedio cada autor.
@@ -186,14 +189,17 @@ dist_topicos <- dist_topicos %>%
   mutate(fecha=round(fecha))
 
 
-names(dist_topicos)[3:22] <- diccionario$nombre_topico
+# names(dist_topicos)[3:22] <- diccionario$nombre_topico
 
 dist_topicos %>% 
   filter(!is.na(fecha)) %>% 
 datatable(., filter = 'top',extensions = 'Buttons', options = list(dom = 'Bfrtip',  buttons = c('excel', "csv", "copy", "pdf"),   pageLength = 20, autoWidth = TRUE),rownames= FALSE) %>%
-  formatPercentage(diccionario$nombre_topico, 2) %>%
-  formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
-  formatStyle(diccionario$nombre_topico, 
+  # formatPercentage(diccionario$nombre_topico, 2) %>%
+  # formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  # formatStyle(diccionario$nombre_topico, 
+  formatPercentage(3:22, 2) %>%
+  formatStyle(3:22, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  formatStyle(3:22,
               backgroundSize = '98% 60%',
               backgroundRepeat = 'no-repeat',
               backgroundPosition = 'center')
@@ -201,7 +207,7 @@ datatable(., filter = 'top',extensions = 'Buttons', options = list(dom = 'Bfrtip
 ```
 
 ```{r}
-topicos_tsne <- tsne(dist_topicos[3:12],k = 2)
+topicos_tsne <- tsne(dist_topicos[3:22],k = 2)
 
 ```
 
@@ -231,7 +237,7 @@ dist_topicos %>% bind_cols(topicos_tsne) %>%
 
 
 ```{r  fig.height=10, fig.width=10}
-topicos_pca <- princomp(dist_topicos[3:12], cor = TRUE)
+topicos_pca <- princomp(dist_topicos[3:22], cor = TRUE)
 
 dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
   ggplot(aes(Comp.1,Comp.2, label=autor, color = fecha)) + 
@@ -262,13 +268,13 @@ dist_topicos <- df  %>%
   bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
 
 
-names(dist_topicos)[3:22] <- diccionario$nombre_topico
+# names(dist_topicos)[3:22] <- diccionario$nombre_topico
 
 ```
 
 
 ```{r warning=FALSE}
-dist_topicos %>% 
+plot <- dist_topicos %>% 
   select(-autor) %>%
   mutate(fecha= round(fecha, -1)) %>% 
   group_by(fecha) %>% 
@@ -281,8 +287,9 @@ dist_topicos %>%
   scale_x_continuous(breaks = scales::pretty_breaks(10))+
   # directlabels::geom_dl(aes(label = topico), method=list("top.qp", cex = .75))+
   theme_minimal()
-  # theme(legend.position = 'none')
+  theme(legend.position = 'none')
 
+plotly::ggplotly(plot)
 ```
 
 obs: El dataset tiene mucho de Allende, Tópico 6. Tal vez habria que subsamplear.
@@ -359,5 +366,42 @@ ggraph() +
     geom_node_text(aes(label=name),check_overlap = T,nudge_y =-.5 ) +
   theme_void()+
   scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1900)
+```
+
+
+
+
+```{r}
+as_tbl_graph(g) %>% 
+  filter(fecha>1800) %>% 
+  activate(nodes) %>%
+# as_tbl_graph(g) %>% 
+#   filter(fecha>1800,
+#          !degree(g)<2) %>% 
+ggraph() + 
+    geom_edge_link(color='grey') + 
+    geom_node_point(aes(color=fecha))+
+    geom_node_text(aes(label=name),check_overlap = T,nudge_y =-.5 ) +
+  theme_void()+
+  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1900)
+```
+
+
+```{r}
+grafo_plot <- as_tbl_graph(g) %>% 
+  filter(fecha>1800) %>% 
+  activate(nodes) %>%
+# as_tbl_graph(g) %>% 
+#   filter(fecha>1800,
+#          !degree(g)<2) %>% 
+ggraph() + 
+    geom_edge_link(color='grey') + 
+    geom_node_point(aes(color=fecha,label=name))+
+    geom_node_text(aes(label=name),check_overlap = T,nudge_y =-.5 ) +
+  theme_void()+
+  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1900)
+
+
+plotly::ggplotly(grafo_plot)
 ```
 
