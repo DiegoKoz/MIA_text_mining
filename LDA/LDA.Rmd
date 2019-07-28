@@ -82,17 +82,16 @@ Corpus = tm_map(Corpus, removeWords, palabras_eliminar)
 dtm <- DocumentTermMatrix(Corpus)
 rm(Corpus)
 gc()
-tm::nTerms(dtm)
+# tm::nTerms(dtm)
 #elimino los docuemntos vacios
-# rowTotals <- apply(dtm , 1, sum)
-rowTotals <- rowSums(as.matrix(dtm))
-nDocs(dtm)
-dtm   <- dtm[rowTotals> 0, ]
-nDocs(dtm)
+# rowTotals <- rowSums(as.matrix(dtm))
+# nDocs(dtm)
+# dtm   <- dtm[rowTotals> 0, ]
+# nDocs(dtm)
 
 write_rds(dtm, 'data/dtm_MIA.rds')
 
-df <- df[which(rowTotals>0),] #%>%  #tengo que eliminar ese docuemnto que estaba vacio
+# df <- df[which(rowTotals>0),] #%>%  #tengo que eliminar ese docuemnto que estaba vacio
 ```
 
 
@@ -111,14 +110,14 @@ gc()
 
 
 ```{r eval=FALSE}
-lda_fit <- LDA(dtm, k = 10,method = "Gibbs", control = list(delta=0.6,seed = 1234))
+lda_fit <- LDA(dtm, k = 20,method = "Gibbs", control = list(delta=0.6,seed = 1234))
 lda_fit
 
-saveRDS(lda_fit, 'modelos/MIA_lda.rds') # Tarda mucho en correr, asi que guardamos los resultados
+saveRDS(lda_fit, 'modelos/MIA_lda20.rds') # Tarda mucho en correr, asi que guardamos los resultados
 ```
 
 ```{r}
-lda_fit <- read_rds('modelos/MIA_lda.rds')
+lda_fit <- read_rds('modelos/MIA_lda20.rds')
 ```
 
 
@@ -126,6 +125,15 @@ lda_fit <- read_rds('modelos/MIA_lda.rds')
 Terms <- terms(lda_fit, 10)
 Terms
 ```
+
+
+```{r}
+diccionario <- tibble(
+n_topico = 1:20,
+nombre_topico = c('perestroika','formato','interna_bolche','pcf','expulsados','orwell','?','althusser','turcos','bolivia','longuet','ejercito','chile','españa','indoamericana','lenin','argentina','china','trabajo_prod','partido')
+)
+```
+
 
 
 Visualizacion
@@ -166,46 +174,6 @@ serVis(json_res)
 
 ```{r}
 
-## Temporal, df viejo
-df <- read_rds('../data/txt/MIA.RDS') 
-
-fechas <- read_csv('../data/txt/fechas.csv')
-
-limpiar_textos <- function(x){
-  
-  x %>% 
-    iconv(., from = 'UTF-8', to = 'ASCII//TRANSLIT') %>% 
-    # rvest::repair_encoding(., from = Encoding(x)) %>%
-    str_replace_all(pattern = "[^[:alnum:]]", replacement = " ") %>%
-    str_replace_all(pattern = "(?i)#([0-9A-F]{2})\1{2}", replacement = " ") %>%
-    str_replace_all(pattern = "\n", replacement = " ") %>%
-    str_replace_all(pattern = "[\\^]", replacement = " ") %>%
-    str_replace_all(pattern = "\"", replacement = " ") %>%
-    str_replace_all(pattern = "<.*>", replacement = " ") %>%
-    str_replace_all(pattern = "<[^>]*>", replacement = " ") %>%
-    str_replace_all(pattern = "<.*?>", replacement = " ") %>%
-    str_replace_all(pattern = "\\s+", replacement = " ") %>%
-    str_replace_all(pattern = "\\{ .* \\}", replacement = " ") %>%
-    str_trim(side = "both")
-}
-
-fechas <- fechas %>% distinct(autor,titulo, .keep_all = TRUE) %>% 
-  mutate(titulo = limpiar_textos(titulo))
-
-df <- df %>% 
-  filter(tipo=='notas')
-
-sum(duplicated(fechas[,c("autor", "titulo")]))
-
-df <- df %>% 
-    left_join(fechas,by = c("autor", "titulo"))
-## Temporal, df viejo
-```
-
-
-
-```{r}
-
 dist_topicos <- df  %>% 
   select(autor, fecha) %>% 
   bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
@@ -215,12 +183,15 @@ dist_topicos <- dist_topicos %>%
   summarise_all(~mean(.x, na.rm = T)) %>% 
   mutate(fecha=round(fecha))
 
+
+names(dist_topicos)[3:22] <- diccionario$nombre_topico
+
 dist_topicos %>% 
   filter(!is.na(fecha)) %>% 
 datatable(., filter = 'top',extensions = 'Buttons', options = list(dom = 'Bfrtip',  buttons = c('excel', "csv", "copy", "pdf"),   pageLength = 20, autoWidth = TRUE),rownames= FALSE) %>%
-  formatPercentage(c('1','2','3','4','5','6','7','8','9','10'), 2) %>%
-  formatStyle(c('1','2','3','4','5','6','7','8','9','10'), background = styleColorBar(c(0,1), 'deepskyblue')) %>%
-  formatStyle(c('1','2','3','4','5','6','7','8','9','10'), 
+  formatPercentage(diccionario$nombre_topico, 2) %>%
+  formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  formatStyle(diccionario$nombre_topico, 
               backgroundSize = '98% 60%',
               backgroundRepeat = 'no-repeat',
               backgroundPosition = 'center')
@@ -248,11 +219,11 @@ dist_topicos %>% bind_cols(topicos_tsne) %>%
 ```{r fig.height=10, fig.width=10}
 
 dist_topicos %>% bind_cols(topicos_tsne) %>% 
-  filter(!is.na(fecha)) %>% 
+  filter(!is.na(fecha), fecha>1800) %>% 
   ggplot(aes(tsne_proj_1,tsne_proj_2, label=autor, color=fecha)) + 
   geom_text()+
   theme_minimal()+
-  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1850)
+  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1940)
 ```
 
 
@@ -272,11 +243,11 @@ dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>%
 
 ```{r fig.height=10, fig.width=10}
 dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
-  filter(!is.na(fecha)) %>% 
+  filter(!is.na(fecha),fecha>1800) %>% 
   ggplot(aes(Comp.1,Comp.2, label=autor, color = fecha)) + 
   geom_text()+
   theme_minimal()+
-  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1850)
+  scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1940)
 
 ```
 
@@ -287,20 +258,28 @@ dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>%
 dist_topicos <- df  %>% 
   select(autor, fecha) %>% 
   bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
+
+
+names(dist_topicos)[3:22] <- diccionario$nombre_topico
+
 ```
 
 
-```{r}
+```{r warning=FALSE}
 dist_topicos %>% 
   select(-autor) %>%
   mutate(fecha= round(fecha, -1)) %>% 
   group_by(fecha) %>% 
   summarise_all(~mean(.x, na.rm = T)) %>% 
   filter(!is.na(fecha), fecha>1800) %>% 
-  gather(topico, valor,2:11) %>% 
-  mutate(topico=factor(topico, levels = 1:10)) %>% 
+  gather(topico, valor,2:21) %>% 
+  mutate(topico=factor(topico)) %>% 
   ggplot(aes(fecha, valor, group=topico, color=topico, fill=topico))+
-  geom_line()
+  geom_line()+
+  scale_x_continuous(breaks = scales::pretty_breaks(10))+
+  # directlabels::geom_dl(aes(label = topico), method=list("top.qp", cex = .75))+
+  theme_minimal()
+  # theme(legend.position = 'none')
 
 ```
 
@@ -320,7 +299,7 @@ dist_topicos_autor <- dist_topicos %>%
   summarise_all(~mean(.x, na.rm = T)) %>% 
   mutate(fecha=round(fecha))
 
-adjMat = cosine(t(as.matrix(dist_topicos_autor[,3:11]))) 
+adjMat = cosine(t(as.matrix(dist_topicos_autor[,3:21]))) 
 
 colnames(adjMat) <- dist_topicos_autor$autor
 rownames(adjMat) <- dist_topicos_autor$autor
@@ -332,9 +311,11 @@ fivenum(adjMat)
 ```
 
 ```{r}
-#la paso a dicotomica, no quiero que me quede muy densa, asi que pongo como punto de corte alguito apenas el tercer cuartil
-adjMat[adjMat>0.89] <- 1
-adjMat[adjMat<0.89] <- 0
+#la paso a dicotomica, no quiero que me quede muy densa, asi que pongo como punto de corte un valor alto
+
+adjMat[adjMat>0.9] <- 1
+
+adjMat[adjMat<0.9] <- 0
 
 adjMat[1:5,1:5]
 
