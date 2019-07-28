@@ -166,9 +166,11 @@ topicmodels_json_ldavis <- function(fitted, dtm){
 ```{r}
 json_res <- topicmodels_json_ldavis(lda_fit, dtm)
 
-serVis(json_res)
 ```
 
+```{r}
+serVis(json_res,as.gist = T)
+```
 
 # Se puede calcular el tema del que habla en promedio cada autor.
 
