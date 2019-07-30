@@ -8,6 +8,7 @@ fuente: https://github.com/DiegoKoz/MIA_text_mining
 > Warning: Este dataset es muy pesado. Eso implica que lleva tiempo correr los modelos y que puede no entrar en la memoria de la computadora. Para la clase, se puede hacer un muestreo de textos para que no pese tanto
 
 ```{r setup}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 library(tidyverse)
 library(glue)
 library(tm)
@@ -23,6 +24,8 @@ library(lsa)
 library(igraph)
 library(ggraph)
 library(tidygraph)
+library(cluster)
+library(plotly)
 ```
 
 ```{r}
@@ -32,6 +35,8 @@ df <- read_csv('../data/txt/texto_limpio.txt')
 # df <- read_rds('data/MIA.RDS')
 df <- df %>% 
   filter(tipo=='notas')
+
+
 ```
 
 
@@ -49,7 +54,6 @@ df <- df %>%
          # texto = str_replace_all(texto,'(NUM)+','NUM'),
          texto = str_replace_all(texto,"\\s+", " "))
 ```
-
 
 
 Para topic modeling las palabras comunes de la lengua generan mucho ruido y terminan predominnado en los topicos.
@@ -74,12 +78,13 @@ gc()
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 
 Corpus = VCorpus(VectorSource(df$texto))
 Corpus = tm_map(Corpus, removeWords, palabras_eliminar)
 # Corpus <- tm_map(Corpus, stemDocument, language = "spanish") # Corpus  
 
+# dtm <- DocumentTermMatrix(Corpus, control = list(weighting = function(x) weightTfIdf(x, normalize =TRUE)))
 dtm <- DocumentTermMatrix(Corpus)
 rm(Corpus)
 gc()
@@ -110,8 +115,9 @@ gc()
 
 
 
-```{r }
-lda_fit <- LDA(dtm, k = 20,method = "Gibbs", control = list(delta=0.6,seed = 1234))
+```{r, eval=FALSE }
+# lda_fit <- LDA(dtm, k = 20,method = "Gibbs", control = list(delta=0.6,seed = 1234))
+lda_fit <- LDA(dtm, k = 20,method = "Gibbs", control = list(delta=0.1,seed = 1234))
 lda_fit
 
 saveRDS(lda_fit, 'modelos/MIA_lda20.rds') # Tarda mucho en correr, asi que guardamos los resultados
@@ -131,10 +137,11 @@ Terms
 
 
 ```{r}
-# diccionario <- tibble(
-# n_topico = 1:20,
-# nombre_topico = c('interna_bolche','formato','interna_bolche','pcf','expulsados','orwell','?','althusser','turcos','bolivia','longuet','ejercito','chile','españa','indoamericana','lenin','argentina','china','trabajo_prod','partido')
-# )
+diccionario <- tibble(
+n_topico = 1:20,
+# nombre_topico = c('nolabel1','Lenin','mitin','Hombre&Sociedad','Chile','Gramsci','interna_bolchevique','GPU','ANAPO','Judiciales','Partido','Bolivia','Islam','nolabel2','Economia','España','China','Lula','nolabel3','Ejercito rojo')
+nombre_topico = c('Humanidad','Trotksy','Campesinos','Economia','Imperialismo','tiempo&lugar','oposicion','Stalin','Marx','Historia', 'Partido','Iglesia', 'Chile','Revolucion', 'produccion','España', 'China','2da_Guerra', 'Clase_obrera','Ejercito_rojo')
+)
 ```
 
 
@@ -183,31 +190,34 @@ dist_topicos <- df  %>%
   select(autor, fecha) %>% 
   bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
 
-dist_topicos <- dist_topicos %>% 
+
+names(dist_topicos)[3:22] <- diccionario$nombre_topico
+
+
+dist_topicos_autor <- dist_topicos %>% 
   group_by(autor) %>% 
   summarise_all(~mean(.x, na.rm = T)) %>% 
   mutate(fecha=round(fecha))
 
 
-# names(dist_topicos)[3:22] <- diccionario$nombre_topico
-
-dist_topicos %>% 
+dist_topicos_autor %>% 
   filter(!is.na(fecha)) %>% 
 datatable(., filter = 'top',extensions = 'Buttons', options = list(dom = 'Bfrtip',  buttons = c('excel', "csv", "copy", "pdf"),   pageLength = 20, autoWidth = TRUE),rownames= FALSE) %>%
-  # formatPercentage(diccionario$nombre_topico, 2) %>%
-  # formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
-  # formatStyle(diccionario$nombre_topico, 
-  formatPercentage(3:22, 2) %>%
-  formatStyle(3:22, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
-  formatStyle(3:22,
+  formatPercentage(diccionario$nombre_topico, 2) %>%
+  formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  formatStyle(diccionario$nombre_topico, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  formatStyle(diccionario$nombre_topico,
+  # formatPercentage(3:22, 2) %>%
+  # formatStyle(3:22, background = styleColorBar(c(0,1), 'deepskyblue')) %>%
+  # formatStyle(3:22,
               backgroundSize = '98% 60%',
               backgroundRepeat = 'no-repeat',
               backgroundPosition = 'center')
 
 ```
 
-```{r}
-topicos_tsne <- tsne(dist_topicos[3:22],k = 2)
+```{r message=FALSE, warning=FALSE}
+topicos_tsne <- tsne(dist_topicos_autor[3:22],k = 2)
 
 ```
 
@@ -217,7 +227,7 @@ topicos_tsne <- tsne(dist_topicos[3:22],k = 2)
 
 topicos_tsne <- as_tibble(topicos_tsne,.name_repair = ~glue('tsne_proj_{c(1,2)}'))
 
-grafico <- dist_topicos %>% bind_cols(topicos_tsne) %>% 
+grafico <- dist_topicos_autor %>% bind_cols(topicos_tsne) %>% 
   ggplot(aes(tsne_proj_1,tsne_proj_2, label=autor, color=fecha)) + 
   geom_text()+
   theme_minimal()+
@@ -228,7 +238,7 @@ plotly::ggplotly(grafico)
 ```
 ```{r fig.height=10, fig.width=10}
 
-dist_topicos %>% bind_cols(topicos_tsne) %>% 
+dist_topicos_autor %>% bind_cols(topicos_tsne) %>% 
   filter(!is.na(fecha), fecha>1800) %>% 
   ggplot(aes(tsne_proj_1,tsne_proj_2, label=autor, color=fecha)) + 
   geom_text()+
@@ -239,9 +249,9 @@ dist_topicos %>% bind_cols(topicos_tsne) %>%
 
 
 ```{r  fig.height=10, fig.width=10}
-topicos_pca <- princomp(dist_topicos[3:22], cor = TRUE)
+topicos_pca <- princomp(dist_topicos_autor[3:22], cor = TRUE)
 
-dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
+dist_topicos_autor %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
   ggplot(aes(Comp.1,Comp.2, label=autor, color = fecha)) + 
   geom_text()+
   theme_minimal()+
@@ -252,7 +262,7 @@ dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>%
 
 
 ```{r fig.height=10, fig.width=10}
-dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
+dist_topicos_autor %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>% 
   filter(!is.na(fecha),fecha>1800) %>% 
   ggplot(aes(Comp.1,Comp.2, label=autor, color = fecha)) + 
   geom_text()+
@@ -261,21 +271,34 @@ dist_topicos %>% bind_cols(as_tibble(topicos_pca$scores[,1:2])) %>%
 
 ```
 
-## Por fecha
+
+## Cluster autores
 
 
 ```{r}
-dist_topicos <- df  %>% 
-  select(autor, fecha) %>% 
-  bind_cols(as_tibble(as.matrix(posterior(lda_fit)$topics)))
+k=10
+pam_clusters <- pam(dist_topicos_autor[3:22],k = k,diss = F,stand = T, )
 
+summary(pam_clusters)
 
-# names(dist_topicos)[3:22] <- diccionario$nombre_topico
+plot(silhouette(pam_clusters),col=1:k)
 
+ggplotly(dist_topicos_autor[pam_clusters$id.med,] %>% 
+  gather(topico, valor, 3:22) %>% 
+  ggplot(aes(topico, valor,fill=topico)) + 
+  geom_col() + 
+  facet_wrap(.~autor)+
+  theme(legend.position = 'none'))
 ```
 
 
-```{r warning=FALSE,  fig.height=10, fig.width=10}
+
+
+## Por fecha
+
+
+
+```{r warning=FALSE,  fig.height=7, fig.width=10}
 plot <- dist_topicos %>% 
   select(-autor) %>%
   mutate(fecha= round(fecha, -1)) %>% 
@@ -284,7 +307,7 @@ plot <- dist_topicos %>%
   filter(!is.na(fecha), fecha>1800) %>% 
   gather(topico, valor,2:21) %>% 
   mutate(topico=factor(topico)) %>% 
-  ggplot(aes(fecha, valor, group=topico, color=topico, fill=topico))+
+  ggplot(aes(fecha, valor, color=topico))+
   geom_line()+
   scale_x_continuous(breaks = scales::pretty_breaks(10))+
   # directlabels::geom_dl(aes(label = topico), method=list("top.qp", cex = .75))+
@@ -299,6 +322,8 @@ obs: El dataset tiene mucho de Allende, Tópico 6. Tal vez habria que subsamplea
 ```{r}
 Terms
 ```
+
+
 
 
 ## grafo de autores
@@ -324,9 +349,9 @@ fivenum(adjMat)
 ```{r}
 #la paso a dicotomica, no quiero que me quede muy densa, asi que pongo como punto de corte un valor alto
 
-adjMat[adjMat>0.9] <- 1
+adjMat[adjMat>0.75] <- 1
 
-adjMat[adjMat<0.9] <- 0
+adjMat[adjMat<0.75] <- 0
 
 adjMat[1:5,1:5]
 
@@ -336,9 +361,7 @@ adjMat[1:5,1:5]
 g = graph_from_adjacency_matrix(adjMat, weighted= NULL, mode="undirected", diag=FALSE)
 
 V(g)$fecha <- dist_topicos_autor$fecha #agrego la fecha como atributo de cada autor 
-```
 
-```{r}
 mean(degree(g))
 ```
 
@@ -389,7 +412,9 @@ ggraph() +
 ```
 
 
-```{r}
+El mismo gráfico, de forma interactiva (no esta implementada la visualización de los links)
+
+```{r fig.height=10, fig.width=10}
 grafo_plot <- as_tbl_graph(g) %>% 
   filter(fecha>1800) %>% 
   activate(nodes) %>%
@@ -399,11 +424,53 @@ grafo_plot <- as_tbl_graph(g) %>%
 ggraph() + 
     geom_edge_link(color='grey') + 
     geom_node_point(aes(color=fecha,label=name))+
-    geom_node_text(aes(label=name),check_overlap = T,nudge_y =-.5 ) +
+    # geom_node_text(aes(label=name),check_overlap = T,nudge_y =-.5 ) +
   theme_void()+
   scale_color_gradient2(low = 'darkorange3',mid ='darkgreen' , high = 'dodgerblue', midpoint = 1900)
 
 
 plotly::ggplotly(grafo_plot)
+```
+
+
+```{r}
+comunities_louvain <- as_tbl_graph(g) %>% 
+mutate(community = as.factor(group_louvain()))
+
+comunities_louvain %>% 
+  ggraph(layout = 'kk') + 
+  geom_edge_link(aes(alpha = ..index..), show.legend = FALSE) + 
+  geom_node_point(aes(colour = community,label=name), size = 2) + 
+  theme_graph()
+```
+
+```{r}
+ggplotly(comunities_louvain %>% 
+  ggraph(layout = 'kk') + 
+  geom_edge_link(aes(alpha = ..index..), show.legend = FALSE) + 
+  geom_node_point(aes(colour = community,label=name), size = 2) + 
+  theme_graph() )
+```
+
+
+```{r, fig.height=10, fig.width=10}
+ggplotly(comunities_louvain %>% 
+  vertex_attr() %>% 
+  bind_rows() %>% 
+  select(autor = name, community) %>% 
+  left_join(dist_topicos_autor) %>% 
+  group_by(community) %>% 
+  summarise_if(is.numeric, mean, na.rm = TRUE) %>% 
+  gather(topico, valor, 3:22) %>% 
+  mutate(fecha = round(fecha)) %>% 
+  ggplot(aes(topico, valor,fill=topico, label=topico))+
+  geom_col(position = position_dodge())+
+  facet_wrap(community~fecha, scales = 'free', labeller = label_both) + 
+  theme_minimal()+
+  theme(legend.position = 'none',
+        axis.text.x = element_blank()))
+
+
+
 ```
 

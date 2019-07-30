@@ -131,9 +131,12 @@ fechas_all %>%
 
 
 # estos autores tienen una estructura muy distinta
-
-fechas_all %>% 
+# 
+fechas_all %>%
   write_csv(.,'data/txt/fechas.csv')
+# fechas_all  <-  read_csv('data/txt/fechas.csv')
+
+fechas_all$autor[fechas_all$autor == "marx_engels"] <- "marx engels"
 
 ## limpieza y join
 
@@ -161,15 +164,18 @@ fechas_all <- fechas_all %>%
   mutate(id = paste(autor, titulo, '_'),
       titulo = limpiar_textos(titulo))
 
-texto_limpio <- read_rds('data/txt/textos_limpio.RDS')
+texto_limpio <- read_csv('data/txt/texto_limpio.txt')
+
+texto_limpio <- texto_limpio %>% 
+  select(-link, -link1,-fecha, -id )
+
+# texto_limpio <- read_rds('data/txt/textos_limpio.RDS')
 
 texto_limpio <- texto_limpio %>% 
   left_join(fechas_all,by = c("autor", "titulo"))
 
 texto_limpio <- texto_limpio %>% 
   distinct(autor, titulo,.keep_all = T)
-
-
 
 texto_limpio %>% saveRDS('data/txt/textos_limpio.RDS')
 texto_limpio %>% write_csv('data/txt/texto_limpio.txt')

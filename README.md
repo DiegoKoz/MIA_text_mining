@@ -21,4 +21,4 @@ Scrappeo de https://www.marxists.org/espanol
 ### [Notebook](LDA/LDA.nb.html)
 
 
-### [LDA viz](https://bl.ocks.org/DiegoKoz/raw/f2fc6b054268c397460d93e2c91375ef/#topic=0&lambda=1&term=)
+### [LDA viz](https://bl.ocks.org/DiegoKoz/raw/ba11d92c5161250166e0d709536c10d5/)
